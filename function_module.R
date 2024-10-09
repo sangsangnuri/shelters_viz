@@ -26,18 +26,18 @@ gu_nm <- unique(abv_shelters_4326$gu_nm)
 
 #### 3.Defining Awesome Icons for Map Markers
 # 지상 대피소를 위한 Awesome Icons 정의
-school_icon <- awesomeIcons(
-  icon = 'university',             # 아이콘 이름만 사용 (Font Awesome 아이콘)
-  iconColor = 'white',             # 아이콘 색상
+ground_icon <- awesomeIcons(
+  icon = 'arrow-circle-up',        # 아이콘 이름만 사용 (Font Awesome 아이콘)
+  iconColor = '#FFFFFF',           # 아이콘 색상
   library = 'fa',                  # 아이콘 라이브러리 ('glyphicon' 또는 'fa')
-  markerColor = 'blue')  # 마커색상
+  markerColor = 'blue')            # 마커색상
 
-# 지상 대피소를 위한 Awesome Icons 정의
-building_icon <- awesomeIcons(
-  icon = 'building',           # 건물 아이콘 사용
-  iconColor = 'white',         # 아이콘 색상
-  library = 'fa',              # Font Awesome 라이브러리 사용
-  markerColor = 'blue')    # 마커 색상
+# 지하 대피소를 위한 Awesome Icons 정의
+underground_icon <- awesomeIcons(
+  icon = 'arrow-circle-down',    # 아이콘 사용
+  iconColor = '#FFFFFF',         # 아이콘 색상
+  library = 'fa',                # Font Awesome 라이브러리 사용
+  markerColor = 'blue')          # 마커 색상
 
 
 #### 4.대피소 및 반경 업데이트 함수

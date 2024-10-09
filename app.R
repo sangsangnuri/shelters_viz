@@ -32,11 +32,11 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
   # 지상 대피소 지도 및 테이블 모듈 호출
-  geoServer("geo_ground", shelter_type = "ground", school_icon)
+  geoServer("geo_ground", shelter_type = "ground", ground_icon)
   tableServer("table_ground", data = abv_shelter_strtn_rate)
   
   # 지하 대피소 지도 및 테이블 모듈 호출
-  geoServer("geo_underground", shelter_type = "underground", building_icon)
+  geoServer("geo_underground", shelter_type = "underground", underground_icon)
   tableServer("table_underground", data = und_shelter_strtn_rate)
 }
 
