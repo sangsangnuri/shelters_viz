@@ -24,24 +24,28 @@ radius <- setNames(c(0, 250, 500, 1000, 1500), c('None', paste0(c(250, 500, 1000
 # 지역구 이름
 gu_nm <- unique(abv_shelters_4326$gu_nm)
 
-#### 3.Defining Awesome Icons for Map Markers
-# 지상 대피소를 위한 Awesome Icons 정의
-ground_icon <- awesomeIcons(
-  icon = 'arrow-circle-up',        # 아이콘 이름만 사용 (Font Awesome 아이콘)
-  iconColor = '#FFFFFF',           # 아이콘 색상
-  library = 'fa',                  # 아이콘 라이브러리 ('glyphicon' 또는 'fa')
-  markerColor = 'blue')            # 마커색상
+#### 3. 대피소 아이콘 색상 설정정
+# 포화율에 따라 색상을 지정하는 함수 (벡터화된 조건문)
+get_color <- function(saturation) {
+  ifelse(is.na(saturation), "gray",        # NA 값을 "gray"로 지정
+         ifelse(saturation >= 1000, "red",
+                ifelse(saturation >= 500, "orange",
+                       ifelse(saturation >= 100, "beige", "lightblue"))))
+}
 
-# 지하 대피소를 위한 Awesome Icons 정의
-underground_icon <- awesomeIcons(
-  icon = 'arrow-circle-down',    # 아이콘 사용
-  iconColor = '#FFFFFF',         # 아이콘 색상
-  library = 'fa',                # Font Awesome 라이브러리 사용
-  markerColor = 'blue')          # 마커 색상
-
-
+# addControl을 사용하여 대피소 포화율을 별도의 커스텀 범례 HTML 추가
+shelter_legend_html <- '
+<div id="shelterLegend" style="background: white; padding: 10px; border-radius: 5px;">
+  <strong>대피소 포화율 (%)</strong><br>
+  <i style="background: lightblue; width: 18px; height: 18px; display: inline-block;"></i> 0~99<br>
+  <i style="background: beige; width: 18px; height: 18px; display: inline-block;"></i> 100~499<br>
+  <i style="background: orange; width: 18px; height: 18px; display: inline-block;"></i> 500~999<br>
+  <i style="background: red; width: 18px; height: 18px; display: inline-block;"></i> 1000이상 <br>
+  <i style="background: gray; width: 18px; height: 18px; display: inline-block;"></i> NA
+</div>
+'
 #### 4.대피소 및 반경 업데이트 함수
-updateShelters <- function(show, connect, gu, radius, plot_id, shelter_type, icons) {
+updateShelters <- function(show, connect, gu, hday, tm,radius, plot_id, shelter_type, icons) {
   # shelter_type: "ground" 또는 "underground"
   
   # 그룹명 설정
@@ -51,10 +55,10 @@ updateShelters <- function(show, connect, gu, radius, plot_id, shelter_type, ico
   
   # 데이터셋 설정
   if (shelter_type == "ground") {
-    shelters_data <- abv_shelters_4326 |> filter(gu_nm == gu)
+    shelters_data <- abv_shelters_4326 |> filter(gu_nm == gu, (평일_휴일 == hday|is.na(평일_휴일)), (시간대 == tm|is.na(시간대)))
     lines_data <- abv_lines_sf |> filter(gu_nm == gu)
   } else if (shelter_type == "underground") {
-    shelters_data <- und_shelters_4326 |> filter(gu_nm == gu)
+    shelters_data <- und_shelters_4326 |> filter(gu_nm == gu, (평일_휴일 == hday|is.na(평일_휴일)), (시간대 == tm|is.na(시간대)))
     lines_data <- und_lines_sf |> filter(gu_nm == gu)
   } else {
     stop("Invalid shelter_type. Must be 'ground' or 'underground'.")
@@ -71,15 +75,21 @@ updateShelters <- function(show, connect, gu, radius, plot_id, shelter_type, ico
       proxy |>
         addAwesomeMarkers(
           data = shelters_data,
-          icon = icons,
+          icon = awesomeIcons(
+            icon = icons,            # 아이콘 (여기서는 글리프 아이콘 사용)
+            iconColor = 'white',            # 아이콘 색상
+            library = 'fa',          # 글리프 아이콘 라이브러리
+            markerColor = ~get_color(`대피소 포화율(%)`)  # 포화율에 따른 색상 설정
+          ),
           label = ~fclty_nm,
-          popup = ~paste("수용면적:", fclty_ar, "<br>수용인원:", psbl_num),
+          popup = ~paste("수용인원:", psbl_num, "<br>포화율: ", `대피소 포화율(%)`, "%"),
           clusterOptions = markerClusterOptions(maxClusterRadius = 30),
           group = shelters_group
-        )
+        ) |> 
+        addControl(html = shelter_legend_html, position = "topright", layerId = "shelterLegend")
       
       # 반경 그룹 먼저 제거 후 새로 추가
-      proxy %>%
+      proxy |> 
         clearGroup(circles_group)
       
       # 반경이 0보다 클 때만 추가 ----------
@@ -115,10 +125,11 @@ updateShelters <- function(show, connect, gu, radius, plot_id, shelter_type, ico
     
     # # 대피소 마커 및 반경 제거 ----------    
     } else {   
-      proxy %>%
-        clearGroup(shelters_group) %>%
-        clearGroup(circles_group) %>%
-        clearGroup(polylines_group)
+      proxy |>
+        clearGroup(shelters_group) |>
+        clearGroup(circles_group) |>
+        clearGroup(polylines_group) |> 
+        removeControl("shelterLegend")  # 범례도 제거
     }
     # 성공 시 사용자에게 알림
     # showNotification(paste0(shelter_type, " 대피소가 성공적으로 업데이트되었습니다."), type = "message")
@@ -129,7 +140,7 @@ updateShelters <- function(show, connect, gu, radius, plot_id, shelter_type, ico
 }
 
 #### 5. 모듈 UI 
-# 지도 UI 모듈 함수 
+# 5-1 지도 UI 모듈 함수 
 geoUI <- function(id){
   ns <- NS(id)
   fluidRow( 
@@ -151,7 +162,7 @@ geoUI <- function(id){
   )
 }
 
-# 테이블 UI 모듈 함수
+# 5-2. 테이블 UI 모듈 함수
 tableUI <- function(id){
   ns <- NS(id)
   fluidRow(
@@ -163,7 +174,7 @@ tableUI <- function(id){
 }
 
 #### 6. 모듈 server 
-# 지도 server 모듈 함수
+# 6-1. 지도 server 모듈 함수
 geoServer <- function(id, shelter_type = 'ground', icons) {
   moduleServer(id, function(input, output, session){ 
     ns <- session$ns
@@ -171,7 +182,7 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
     # 반응형 표현식
     gu_input <- reactive(input$gu_nm)
     ppl_input <- reactive(input$ppl)
-    holiday_input <- reactive(input$holiday)
+    holiday_input <- reactive(input$holiday) 
     times_input <- reactive(input$times)
     radius_input <- reactive(as.numeric(input$radius))
     
@@ -208,10 +219,9 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
       unit <- ifelse(ppl_input() == 'avg_people', "명", "명/m²")  # 실제 데이터 단위에 맞게 수정
       round_num <- ifelse(ppl_input() == 'avg_people', 0, 5)  # 실제 데이터 단위에 맞게 수정
       
-      leaflet(filtered_data()) %>%
-        addTiles() %>%
-        #  setView(lng = 126.9779451, lat = 37.5662952, zoom = 14) %>%
-        setView(lng = longitude, lat = latitude, zoom = 13) %>%
+      leaflet(filtered_data()) |> 
+        addTiles() |>
+        setView(lng = longitude, lat = latitude, zoom = 13) |>
         addPolygons(
           fillColor = ~pal(get(ppl_input())),
           color = "chocolate",               # 폴리곤의 테두리 색
@@ -219,7 +229,7 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
           opacity = 0.9,                     # 경계선의 투명도 조절
           fillOpacity = 0.6,                 # 폴리곤 채우기 투명도 조절
           popup = ~paste0(시간대구분, "시간대<br>", legend_title, ": ", round(get(ppl_input()), round_num), unit)
-        ) %>% 
+        ) |> 
         addLegend(
           pal = pal, 
           values = ~get(ppl_input()), 
@@ -232,9 +242,9 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
     # 대피소 체크박스 업데이트 관찰
     observe({
       if (input$show_shelters) {
-        updateShelters(TRUE, input$connect, gu_input(), radius_input(), ns("plot"), shelter_type, icons)
+        updateShelters(TRUE, input$connect, gu_input(), holiday_input(), times_input(), radius_input(), ns("plot"), shelter_type, icons)
       } else {
-        updateShelters(FALSE, FALSE, '중구', 0, ns("plot"), shelter_type, icons)
+        updateShelters(FALSE, FALSE, '중구', '평일', '12', 0, ns("plot"), shelter_type, icons)
         resetShelterInputs()
       }
     })
@@ -242,13 +252,13 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
     # 반경 selectInput 변경 시
     observeEvent(radius_input(), {
       if (input$show_shelters) {
-        updateShelters(TRUE, input$connect, gu_input(), radius_input(), ns("plot"), shelter_type, icons)
+        updateShelters(TRUE, input$connect, gu_input(), holiday_input(), times_input(), radius_input(), ns("plot"), shelter_type, icons)
       }
     })
     # 
     # 중심점 대피소 연결 체크박스 관찰
     observeEvent(input$connect, {
-      updateShelters(input$show_shelters, input$connect, gu_input(), radius_input(), ns("plot"), shelter_type, icons)
+      updateShelters(input$show_shelters, input$connect, gu_input(), holiday_input(), times_input(), radius_input(), ns("plot"), shelter_type, icons)
     })
     
     # 'ppl', 'holiday', 'times' 변경 시 대피소 설정 초기화**
@@ -268,7 +278,7 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
 }
 
 
-# 지도 server 모듈 함수
+# 6-2. 지도 server 모듈 함수
 tableServer <- function(id, data) {
   moduleServer(id, function(input, output, session) {
     # 테이블 데이터 반응형 변수 정의
@@ -276,20 +286,17 @@ tableServer <- function(id, data) {
     holiday <- reactive(input$holiday)
     times <- reactive(input$times)
     
-    # 데이터 테이블 렌더링 
+    # 데이터 테이블 렌더링
     output$table <- renderDataTable({
-      shelter_table <- data |> 
+      shelter_table <- data |>
         filter(
           지역구 == gu_nm(),
           평일_휴일 == holiday(),
           시간대 == times()
-        ) |> 
+        ) |>
         select(-좌표)
-      
+
       datatable(shelter_table, options = list(pageLength = 10))
     })
   })
 }
-
-
-
