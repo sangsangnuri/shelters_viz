@@ -11,7 +11,7 @@ library(bslib)
 library(plotly)
 
 #### 1. 데이터 불러오기
-load("../data/munging_data.RData")
+load("munging_data.RData")
 
 #### 2. Setting Up Named Vectors for UI Elements
 # 인구수/인구밀도
