@@ -8,6 +8,7 @@ library(shiny)
 library(shinythemes)
 library(DT) 
 library(bslib)
+library(plotly)
 
 #### 1. 데이터 불러오기
 load("../data/munging_data.RData")
@@ -24,7 +25,40 @@ radius <- setNames(c(0, 250, 500, 1000, 1500), c('None', paste0(c(250, 500, 1000
 # 지역구 이름
 gu_nm <- unique(abv_shelters_4326$gu_nm)
 
-#### 3. 대피소 아이콘 색상 설정정
+#### 3. 히스토그램, 박스플롯 
+## 여백 설정을 위한 변수 설정
+margins_R <- list(t = 50, b = 25, l = 25, r = 25)
+
+# 최단거리 시각화 함수
+min_dist_plot <- function(data){
+  ggplot(data, aes(x = min_dist)) +
+    geom_histogram(aes(y = ..density..), fill = "skyblue", color = "gray", alpha = 0.8) +
+    geom_density(color = "red", size = 0.8) +
+    labs(
+      title = "중심점 최단거리 분포 및 밀도",
+      x = "최단거리 (미터)",
+      y = "밀도"
+    ) +
+    theme_minimal()  +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+      axis.title = element_text(size = 14),
+      axis.text.x = element_text(size = 14),  # x축 레이블 크기 변경
+      axis.text.y = element_text(size = 14),  # y축 레이블 크기 변경
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 10),
+      plot.margin = margin(t =margins_R$t/5 , r = margins_R$r/5, b = margins_R$b/5 , l = margins_R$l/5)
+    )
+}
+
+# 포화율 시각화 함수
+strtn_plot <- function(data){
+  plot_ly(data) |> add_boxplot(x = ~시간대, y = ~`대피소 포화율(%)`, color = ~`평일_휴일`, colors = "Set2") |> 
+    layout(boxmode = "group", title = list(text = "대피소 포화율(%) 분포"), yaxis = list(title = "대피소 포화율(%)"), margin = margins_R)
+}
+
+
+#### 4. 대피소 아이콘 색상 설정
 # 포화율에 따라 색상을 지정하는 함수 (벡터화된 조건문)
 get_color <- function(saturation) {
   ifelse(is.na(saturation), "gray",        # NA 값을 "gray"로 지정
@@ -44,7 +78,7 @@ shelter_legend_html <- '
   <i style="background: gray; width: 18px; height: 18px; display: inline-block;"></i> NA
 </div>
 '
-#### 4.대피소 및 반경 업데이트 함수
+#### 5.대피소 및 반경 업데이트 함수
 updateShelters <- function(show, connect, gu, hday, tm,radius, plot_id, shelter_type, icons) {
   # shelter_type: "ground" 또는 "underground"
   
@@ -139,10 +173,11 @@ updateShelters <- function(show, connect, gu, hday, tm,radius, plot_id, shelter_
   })
 }
 
-#### 5. 모듈 UI 
-# 5-1 지도 UI 모듈 함수 
+#### 6. 모듈 UI 
+# 6-1 지도 UI 모듈 함수 
 geoUI <- function(id){
   ns <- NS(id)
+  tagList(
   fluidRow( 
     column(9, leafletOutput(ns("plot"), height = '700px')),           
     column(3, selectInput(ns('gu_nm'), '지역구', choices = gu_nm, selected = '중구'),
@@ -154,15 +189,26 @@ geoUI <- function(id){
               # 대피소 표시 시 반경 선택 메뉴 표시
               conditionalPanel(
                 condition = sprintf("input['%s'] == true", ns("show_shelters")),
+                tagList(
                 selectInput(ns('radius'), '반경', choices = radius, selected = 0),
               # 대피소와 집계구 연결을 위한 체크박스
               checkboxInput(ns('connect'), "집계구 중심점과 대피소 연결", FALSE)
+                )
               )
            )
+  ),
+  fluidRow( 
+    column(5, plotOutput(ns("plot2"))),
+    column(7, plotlyOutput(ns("plot3"), inline=TRUE))
+  ),
+  fluidRow( 
+    column(5, tableOutput(ns("dist_rate"))),
+    column(7, tableOutput(ns("dist_ppl"))),
+  )
   )
 }
 
-# 5-2. 테이블 UI 모듈 함수
+# 6-2. 테이블 UI 모듈 함수
 tableUI <- function(id){
   ns <- NS(id)
   fluidRow(
@@ -173,8 +219,8 @@ tableUI <- function(id){
   )
 }
 
-#### 6. 모듈 server 
-# 6-1. 지도 server 모듈 함수
+#### 7. 모듈 server 
+# 7-1. 지도 server 모듈 함수
 geoServer <- function(id, shelter_type = 'ground', icons) {
   moduleServer(id, function(input, output, session){ 
     ns <- session$ns
@@ -201,6 +247,7 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
         filter(SIGUNGU_NM == gu_input(), 평일_휴일 == holiday_input(), 시간대구분 == times_input())
     })
     
+
     # Leaflet 지도 렌더링
     output$plot <- renderLeaflet({
       req(filtered_data())
@@ -274,11 +321,73 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
       }
     })
     
+    
+    # 히스토그램 및 밀도
+    selected_data <- reactive({
+      if(shelter_type == 'ground'){
+        list(
+          min_dist_data = grid_abv_shelters |> filter(SIGUNGU_NM == gu_input()),
+          strtn_rate_data = abv_shelter_strtn_rate |> filter(지역구 == gu_input()),
+          dist_rate_data = grid_abv_shelters |> filter(SIGUNGU_NM == gu_input()) |> 
+            st_drop_geometry() |> select(min_dist),
+          dist_ppl_data = living_people_abv_grid_4326 |> filter(SIGUNGU_NM == gu_input()) |>  
+            # 지오메트리 열 제거 (sf 객체의 경우)
+            st_drop_geometry() |> select(평일_휴일, 시간대구분, min_dist, avg_people)
+        )
+      } else{
+        list(
+          min_dist_data = grid_und_shelters |> filter(SIGUNGU_NM == gu_input()),
+          strtn_rate_data = und_shelter_strtn_rate |> filter(지역구 == gu_input()),
+          dist_rate_data = grid_und_shelters |> filter(SIGUNGU_NM == gu_input()) |> 
+            st_drop_geometry() |> select(min_dist),
+          dist_ppl_data = living_people_und_grid_4326 |> filter(SIGUNGU_NM == gu_input()) |> 
+            # 지오메트리 열 제거 (sf 객체의 경우)
+            st_drop_geometry() |> select(평일_휴일, 시간대구분, min_dist, avg_people)
+        )
+      }
+    })
+    
+    # 히스토그램 및 밀도
+    output$plot2 <- renderPlot({
+      req(selected_data()$min_dist_data)  
+      min_dist_plot(selected_data()$min_dist_data)
+    })
+    
+    # boxplot
+    output$plot3 <- renderPlotly({
+      req(selected_data()$strtn_rate_data)  
+      strtn_plot(selected_data()$strtn_rate_data)
+    })
+    
+    # 거리별 미도달인구 비율
+    output$dist_ppl <- renderTable({
+      req(selected_data()$dist_ppl_data)  
+      selected_data()$dist_ppl_data |> group_by(평일_휴일, 시간대구분) |> 
+        summarise(
+          `전체인구` = round(sum(avg_people, na.rm = TRUE), 0),                                   # 전체 인구수
+          `미도달인구(500m이상)` = round(sum(avg_people[min_dist >= 500], na.rm = TRUE), 0),      # min_dist >= 500인 인구수
+          `비율(500m이상)` = round(`미도달인구(500m이상)` / `전체인구` * 100, 2),                 # 비율 계산
+          `미도달인구(1000m이상)` = round(sum(avg_people[min_dist >= 1000], na.rm = TRUE), 0),    # min_dist >= 1000인 인구수
+          `비율(1000m이상)` = round(`미도달인구(1000m이상)` / `전체인구` * 100, 2), .groups = "drop")                # 비율 계산
+    })
+    
+    # 거리별 집계구 비율
+    output$dist_rate <- renderTable({
+      req(selected_data()$dist_rate_data)  
+      selected_data()$dist_rate_data |> 
+        summarise(`전체집계구` = n(),
+                  `미도달집계구(500m이상)` = sum(min_dist >= 500, na.rm = TRUE),
+                  `미도달비율(%)(500m이상)` = round(mean(min_dist >= 500, na.rm = TRUE)*100, 2),
+                  `미도달집계구(1000m이상)` = sum(min_dist >= 1000, na.rm = TRUE),
+                  `미도달비율(%)(1000m이상)` = round(mean(min_dist >= 1000, na.rm = TRUE)*100, 2))
+      
+    })
+    
   })
 }
 
 
-# 6-2. 지도 server 모듈 함수
+# 7-2. 지도 server 모듈 함수
 tableServer <- function(id, data) {
   moduleServer(id, function(input, output, session) {
     # 테이블 데이터 반응형 변수 정의

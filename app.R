@@ -14,7 +14,6 @@ ui <- fluidPage(
              tableUI('table_ground')
              
     ),
-    
     # 지하 대피소 지도 시각화 
     tabPanel('지하 대피소 지도 시각화',
              theme=bslib::bs_theme(bootswatch='cerulean'),    # cerulean 부트스와치 테마 사용
@@ -23,14 +22,12 @@ ui <- fluidPage(
              
              titlePanel(h3("지역별 지상 대피소 수용인원 및 포화율", style='background-color:lightsteelblue', align = "center")),
              tableUI('table_underground')
-             
     )
   )
 )
 
 #### Define server logic required to draw plots ----------------
 server <- function(input, output, session) {
-  
   # 지상 대피소 지도 및 테이블 모듈 호출
   geoServer("geo_ground", shelter_type = "ground", 'arrow-circle-up')
   tableServer("table_ground", data = abv_shelter_strtn_rate)
