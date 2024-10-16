@@ -1,14 +1,33 @@
+# 필요한 패키지 목록 정의
+required_packages <- c("tidyverse", "ggplot2", "plotly", "sf", "sp", "leaflet", "leaflet.extras", "shiny", "shinythemes", "DT", "bslib", "plotly")
+
+# 패키지 설치 및 로드 함수
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    # 패키지가 설치되어 있는지 확인
+    if (!require(pkg, character.only = TRUE)) {
+      # 패키지가 설치되어 있지 않으면 설치
+      install.packages(pkg, dependencies = TRUE)
+      # 설치 후 패키지 로드
+      library(pkg, character.only = TRUE)
+    }
+  }
+}
+
+# 필요한 패키지 설치 및 로드
+install_and_load(required_packages)
+
 # 필요한 패키지 로드
-library(tidyverse)
-library(sf)
-library(sp)
-library(leaflet)
-library(leaflet.extras)
-library(shiny)
-library(shinythemes)
-library(DT) 
-library(bslib)
-library(plotly)
+# library(tidyverse)
+# library(sf)
+# library(sp)
+# library(leaflet)
+# library(leaflet.extras)
+# library(shiny)
+# library(shinythemes)
+# library(DT) 
+# library(bslib)
+# library(plotly)
 
 #### 1. 데이터 불러오기
 load("munging_data.RData")
