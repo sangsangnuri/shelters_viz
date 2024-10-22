@@ -30,7 +30,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   # 지상 대피소 지도 및 테이블 모듈 호출
   geoServer("geo_ground", shelter_type = "ground", 'arrow-circle-up')
-  tableServer("table_ground", data = abv_shelter_strtn_rate)
+  tableServer("table_ground", data = gnd_shelter_strtn_rate)
   
   # 지하 대피소 지도 및 테이블 모듈 호출
   geoServer("geo_underground", shelter_type = "underground", 'arrow-circle-down')
