@@ -1,14 +1,21 @@
-# 필요한 패키지 로드
-library(tidyverse)
-library(sf)
-library(sp)
-library(leaflet)
-library(leaflet.extras)
-library(shiny)
-library(shinythemes)
-library(DT) 
-library(bslib)
-library(plotly)
+# 필요한 패키지 목록 정의
+required_packages <- c("tidyverse", "ggplot2", "plotly", "sf", "sp", "leaflet", "leaflet.extras", "shiny", "shinythemes", "DT", "bslib", "plotly")
+
+# 패키지 설치 및 로드 함수
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    # 패키지가 설치되어 있는지 확인
+    if (!require(pkg, character.only = TRUE)) {
+      # 패키지가 설치되어 있지 않으면 설치
+      install.packages(pkg, dependencies = TRUE)
+      # 설치 후 패키지 로드
+      library(pkg, character.only = TRUE)
+    }
+  }
+}
+
+# 필요한 패키지 설치 및 로드
+install_and_load(required_packages)
 
 #### 1. 데이터 불러오기
 load("munging_data.RData")
@@ -23,7 +30,7 @@ times <- setNames(c('00', '06', '12', '18'), paste0(seq(0, 18, 6), '시간대'))
 # 반경
 radius <- setNames(c(0, 250, 500, 1000, 1500), c('None', paste0(c(250, 500, 1000, 1500), 'M')))
 # 지역구 이름
-gu_nm <- unique(abv_shelters_4326$gu_nm)
+gu_nm <- unique(gnd_shelters_4326$gu_nm)
 
 #### 3. 히스토그램, 박스플롯 
 ## 여백 설정을 위한 변수 설정
@@ -54,7 +61,7 @@ min_dist_plot <- function(data){
 # 포화율 시각화 함수
 strtn_plot <- function(data){
   plot_ly(data) |> add_boxplot(x = ~시간대, y = ~`대피소 포화율(%)`, color = ~`평일_휴일`, colors = "Set2") |> 
-    layout(boxmode = "group", title = list(text = "대피소 포화율(%) 분포"), yaxis = list(title = "대피소 포화율(%)"), margin = margins_R)
+    layout(boxmode = "group", title = list(text = "<b>대피소 포화율(%) 분포</b>", x = 0.5), yaxis = list(title = "대피소 포화율(%)"), margin = margins_R)
 }
 
 
@@ -89,8 +96,8 @@ updateShelters <- function(show, connect, gu, hday, tm,radius, plot_id, shelter_
   
   # 데이터셋 설정
   if (shelter_type == "ground") {
-    shelters_data <- abv_shelters_4326 |> filter(gu_nm == gu, (평일_휴일 == hday|is.na(평일_휴일)), (시간대 == tm|is.na(시간대)))
-    lines_data <- abv_lines_sf |> filter(gu_nm == gu)
+    shelters_data <- gnd_shelters_4326 |> filter(gu_nm == gu, (평일_휴일 == hday|is.na(평일_휴일)), (시간대 == tm|is.na(시간대)))
+    lines_data <- gnd_lines_sf |> filter(gu_nm == gu)
   } else if (shelter_type == "underground") {
     shelters_data <- und_shelters_4326 |> filter(gu_nm == gu, (평일_휴일 == hday|is.na(평일_휴일)), (시간대 == tm|is.na(시간대)))
     lines_data <- und_lines_sf |> filter(gu_nm == gu)
@@ -197,13 +204,23 @@ geoUI <- function(id){
               )
            )
   ),
-  fluidRow( 
+  fluidRow(
     column(5, plotOutput(ns("plot2"))),
-    column(7, plotlyOutput(ns("plot3"), inline=TRUE))
+    column(5, plotlyOutput(ns("plot3"), inline = TRUE)),
+    column(2, tags$div(
+      h5(HTML("최단거리 1km 이상 &<br>인구밀집 지역(90분위수)"), style = "font-weight: bold;"),
+      tableOutput(ns("location"))
+    ))
   ),
-  fluidRow( 
-    column(5, tableOutput(ns("dist_rate"))),
-    column(7, tableOutput(ns("dist_ppl"))),
+  fluidRow(
+    column(5, tags$div(
+      h5("미도달 집계구 비율", style = "font-weight: bold; text-align: center;"),
+      tableOutput(ns("dist_rate"))
+    )),
+    column(7, tags$div(
+      h5("미도달 인구 비율", style = "font-weight: bold; text-align: center;"),
+      tableOutput(ns("dist_ppl"))
+    ))
   )
   )
 }
@@ -240,14 +257,14 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
     
     # 데이터 필터링
     filtered_data <- reactive({
-      req(living_people_abv_grid_4326)
+      req(living_people_grid_4326)
       req(gu_input(), holiday_input(), times_input())
       
-      living_people_abv_grid_4326 |> 
+      living_people_grid_4326 |> 
         filter(SIGUNGU_NM == gu_input(), 평일_휴일 == holiday_input(), 시간대구분 == times_input())
     })
     
-
+    
     # Leaflet 지도 렌더링
     output$plot <- renderLeaflet({
       req(filtered_data())
@@ -275,7 +292,7 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
           weight = 1,                        # 경계선 테두리 두께
           opacity = 0.9,                     # 경계선의 투명도 조절
           fillOpacity = 0.6,                 # 폴리곤 채우기 투명도 조절
-          popup = ~paste0(시간대구분, "시간대<br>", legend_title, ": ", round(get(ppl_input()), round_num), unit)
+          popup = ~paste0(ADM_NM, "<br>", legend_title, ": ", round(get(ppl_input()), round_num), unit)
         ) |> 
         addLegend(
           pal = pal, 
@@ -295,7 +312,7 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
         resetShelterInputs()
       }
     })
-
+    
     # 반경 selectInput 변경 시
     observeEvent(radius_input(), {
       if (input$show_shelters) {
@@ -326,23 +343,25 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
     selected_data <- reactive({
       if(shelter_type == 'ground'){
         list(
-          min_dist_data = grid_abv_shelters |> filter(SIGUNGU_NM == gu_input()),
-          strtn_rate_data = abv_shelter_strtn_rate |> filter(지역구 == gu_input()),
-          dist_rate_data = grid_abv_shelters |> filter(SIGUNGU_NM == gu_input()) |> 
-            st_drop_geometry() |> select(min_dist),
-          dist_ppl_data = living_people_abv_grid_4326 |> filter(SIGUNGU_NM == gu_input()) |>  
+          min_dist_data = grid_shelters |> filter(SIGUNGU_NM == gu_input()) |> st_drop_geometry() |> rename(min_dist = gnd_min_dist),
+          strtn_rate_data = gnd_shelter_strtn_rate |> filter(지역구 == gu_input()),
+          dist_rate_data = grid_shelters |> filter(SIGUNGU_NM == gu_input()) |> 
+            st_drop_geometry() |> select(gnd_min_dist) |> rename(min_dist = gnd_min_dist),
+          dist_ppl_data = living_people_grid_4326 |> filter(SIGUNGU_NM == gu_input()) |>  
             # 지오메트리 열 제거 (sf 객체의 경우)
-            st_drop_geometry() |> select(평일_휴일, 시간대구분, min_dist, avg_people)
+            st_drop_geometry() |> select(평일_휴일, 시간대구분, ADM_NM, gnd_min_dist, avg_people) |> 
+            rename(지역동 = ADM_NM, min_dist = gnd_min_dist)
         )
       } else{
         list(
-          min_dist_data = grid_und_shelters |> filter(SIGUNGU_NM == gu_input()),
+          min_dist_data = grid_shelters |> filter(SIGUNGU_NM == gu_input()) |> st_drop_geometry() |> rename(min_dist = und_min_dist),
           strtn_rate_data = und_shelter_strtn_rate |> filter(지역구 == gu_input()),
-          dist_rate_data = grid_und_shelters |> filter(SIGUNGU_NM == gu_input()) |> 
-            st_drop_geometry() |> select(min_dist),
-          dist_ppl_data = living_people_und_grid_4326 |> filter(SIGUNGU_NM == gu_input()) |> 
+          dist_rate_data = grid_shelters |> filter(SIGUNGU_NM == gu_input()) |> 
+            st_drop_geometry() |> select(und_min_dist) |> rename(min_dist = und_min_dist),
+          dist_ppl_data = living_people_grid_4326 |> filter(SIGUNGU_NM == gu_input()) |> 
             # 지오메트리 열 제거 (sf 객체의 경우)
-            st_drop_geometry() |> select(평일_휴일, 시간대구분, min_dist, avg_people)
+            st_drop_geometry() |> select(평일_휴일, 시간대구분, ADM_NM, und_min_dist, avg_people) |> 
+            rename(지역동 = ADM_NM, min_dist = und_min_dist)
         )
       }
     })
@@ -371,6 +390,19 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
           `비율(1000m이상)` = round(`미도달인구(1000m이상)` / `전체인구` * 100, 2), .groups = "drop")                # 비율 계산
     })
     
+    
+    # 지역구 취약지역 입지 
+    output$location <- renderTable({
+      req(selected_data()$dist_ppl_data) 
+      avg_ppl9 <- selected_data()$dist_ppl_data |> 
+        summarise(
+          deciles = list(quantile(avg_people, probs = seq(0, 1, by = 0.1), na.rm = TRUE))
+        ) |> 
+        pull(deciles) |> unlist()
+      selected_data()$dist_ppl_data |> filter(min_dist > 1000, avg_people > avg_ppl9[10]) |>
+        group_by(지역동) |> count(name = "집계구 개수")
+    })
+    
     # 거리별 집계구 비율
     output$dist_rate <- renderTable({
       req(selected_data()$dist_rate_data)  
@@ -385,7 +417,6 @@ geoServer <- function(id, shelter_type = 'ground', icons) {
     
   })
 }
-
 
 # 7-2. 지도 server 모듈 함수
 tableServer <- function(id, data) {

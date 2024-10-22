@@ -1,0 +1,13 @@
+name: shelters_viz
+title: shelters_viz
+username: sangsangnuri
+account: sangsangnuri
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13033600
+bundleId: 9229944
+url: https://sangsangnuri.shinyapps.io/shelters_viz/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: run_github.R
