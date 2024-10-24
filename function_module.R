@@ -136,7 +136,7 @@ updateShelters <- function(show, connect, gu, hday, tm,radius, plot_id, shelter_
               "<br>포화율: ", `대피소 포화율(%)`, "%", 
               paste0(
                 "<br><b><span style='color:", color, ";'>과부족인원: ", 
-                부족인원, 
+                부족인원, "명",
                 "</span></b>"
               )
             )
