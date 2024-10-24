@@ -123,11 +123,24 @@ updateShelters <- function(show, connect, gu, hday, tm,radius, plot_id, shelter_
             markerColor = ~get_color(`대피소 포화율(%)`)  # 포화율에 따른 색상 설정
           ),
           label = ~fclty_nm,
-          popup = ~paste(
-            "수용인원: ", psbl_num, 
-            "<br>포화율: ", `대피소 포화율(%)`, "%", 
-            paste0("<br><b>과부족인원: ", round(psbl_num * (1 - `대피소 포화율(%)` * 0.01)*-1), "명", "</b>")
-          ),
+          popup = ~{
+            # 과부족 인원 계산
+            부족인원 <- round(psbl_num * (1 - `대피소 포화율(%)` * 0.01)*-1)
+            
+            # 색상 결정 (양수는 파랑, 음수는 빨강)
+            color <- ifelse(부족인원 >= 0, "red", "blue")
+            
+            # 팝업 텍스트 생성
+            paste(
+              "수용인원: ", psbl_num, 
+              "<br>포화율: ", `대피소 포화율(%)`, "%", 
+              paste0(
+                "<br><b><span style='color:", color, ";'>과부족인원: ", 
+                부족인원, 
+                "</span></b>"
+              )
+            )
+          },
           clusterOptions = markerClusterOptions(maxClusterRadius = 30),
           group = shelters_group
         ) |> 
