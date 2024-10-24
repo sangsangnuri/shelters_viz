@@ -79,9 +79,9 @@ shelter_legend_html <- '
 <div id="shelterLegend" style="background: white; padding: 10px; border-radius: 5px;">
   <strong>대피소 포화율 (%)</strong><br>
   <i style="background: lightblue; width: 18px; height: 18px; display: inline-block;"></i> 0~100(양호)<br>
-  <i style="background: beige; width: 18px; height: 18px; display: inline-block;"></i> 101~500(주의)<br>
-  <i style="background: orange; width: 18px; height: 18px; display: inline-block;"></i> 501~1000(위험)<br>
-  <i style="background: red; width: 18px; height: 18px; display: inline-block;"></i> 1000초과(매우위험) <br>
+  <i style="background: beige; width: 18px; height: 18px; display: inline-block;"></i> 101~500(부족:주의)<br>
+  <i style="background: orange; width: 18px; height: 18px; display: inline-block;"></i> 501~1000(부족:위험)<br>
+  <i style="background: red; width: 18px; height: 18px; display: inline-block;"></i> 1000초과(부족:매우위험) <br>
   <i style="background: gray; width: 18px; height: 18px; display: inline-block;"></i> NA
 </div>
 '
