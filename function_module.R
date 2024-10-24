@@ -69,19 +69,19 @@ strtn_plot <- function(data){
 # 포화율에 따라 색상을 지정하는 함수 (벡터화된 조건문)
 get_color <- function(saturation) {
   ifelse(is.na(saturation), "gray",        # NA 값을 "gray"로 지정
-         ifelse(saturation >= 1000, "red",
-                ifelse(saturation >= 500, "orange",
-                       ifelse(saturation >= 100, "beige", "lightblue"))))
+         ifelse(saturation > 1000, "red",
+                ifelse(saturation > 500, "orange",
+                       ifelse(saturation > 100, "beige", "lightblue"))))
 }
 
 # addControl을 사용하여 대피소 포화율을 별도의 커스텀 범례 HTML 추가
 shelter_legend_html <- '
 <div id="shelterLegend" style="background: white; padding: 10px; border-radius: 5px;">
   <strong>대피소 포화율 (%)</strong><br>
-  <i style="background: lightblue; width: 18px; height: 18px; display: inline-block;"></i> 0~99<br>
-  <i style="background: beige; width: 18px; height: 18px; display: inline-block;"></i> 100~499<br>
-  <i style="background: orange; width: 18px; height: 18px; display: inline-block;"></i> 500~999<br>
-  <i style="background: red; width: 18px; height: 18px; display: inline-block;"></i> 1000이상 <br>
+  <i style="background: lightblue; width: 18px; height: 18px; display: inline-block;"></i> 0~100(양호)<br>
+  <i style="background: beige; width: 18px; height: 18px; display: inline-block;"></i> 101~500(주의)<br>
+  <i style="background: orange; width: 18px; height: 18px; display: inline-block;"></i> 501~1000(경고)<br>
+  <i style="background: red; width: 18px; height: 18px; display: inline-block;"></i> 1000초과(긴급) <br>
   <i style="background: gray; width: 18px; height: 18px; display: inline-block;"></i> NA
 </div>
 '
@@ -123,7 +123,11 @@ updateShelters <- function(show, connect, gu, hday, tm,radius, plot_id, shelter_
             markerColor = ~get_color(`대피소 포화율(%)`)  # 포화율에 따른 색상 설정
           ),
           label = ~fclty_nm,
-          popup = ~paste("수용인원:", psbl_num, "<br>포화율: ", `대피소 포화율(%)`, "%"),
+          popup = ~paste(
+            "수용인원: ", psbl_num, 
+            "<br>포화율: ", `대피소 포화율(%)`, "%", 
+            paste0("<br><b>과부족인원: ", round(psbl_num * (1 - `대피소 포화율(%)` * 0.01)*-1), "명", "</b>")
+          ),
           clusterOptions = markerClusterOptions(maxClusterRadius = 30),
           group = shelters_group
         ) |> 
